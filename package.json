@@ -1,0 +1,30 @@
+{
+  "name": "logseq-days-matter",
+  "version": "0.1.0",
+  "description": "Show birthday / anniversary / countdown reminders from page properties in your Logseq journal — Days Matter style.",
+  "main": "dist/index.html",
+  "author": "Zhizhen He",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@logseq/libs": "^0.0.17",
+    "dayjs": "^1.11.21"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^4.5.14",
+    "vite-plugin-logseq": "^1.1.2",
+    "vitest": "^0.34.6"
+  },
+  "logseq": {
+    "id": "logseq-days-matter",
+    "title": "Days Matter",
+    "main": "dist/index.html"
+  }
+}
