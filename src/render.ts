@@ -82,7 +82,7 @@ export function buildSection(entries: RenderEntry[]): string {
   const items = entries.map(renderItem).join("");
   return (
     `<div class="dm-root">` +
-    `<div class="dm-title">📅 Days Matter</div>` +
+    `<div class="dm-title">Days Matter</div>` +
     `<ul class="dm-list">${items}</ul>` +
     `</div>`
   );

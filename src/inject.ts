@@ -4,17 +4,23 @@ import { buildSection, GOTO_MODEL, type RenderEntry } from "./render";
 /** Key for our injected element. */
 const UI_KEY = "days-matter-journal";
 /**
- * Container to anchor the section under. Verified at runtime — Logseq's main
- * content container. Adjust here if a future Logseq version renames it.
+ * Container to anchor the section under. `.journal-item.content` is the single
+ * visible day's journal block. We inject as its last child, so the section
+ * renders below the day's journal body. Verified at runtime; adjust here if a
+ * future Logseq version renames it.
  */
-const CONTAINER_SELECTOR = "#main-content-container";
+const CONTAINER_SELECTOR = ".journal-item.content";
 
 const CSS = `
-.dm-root { margin: 8px 0 16px; padding: 10px 12px; border: 1px solid var(--ls-border-color, #ddd);
-  border-radius: 8px; background: var(--ls-secondary-background-color, transparent); }
-.dm-title { font-weight: 600; opacity: .8; margin-bottom: 6px; font-size: .9em; }
-.dm-list { list-style: none; margin: 0; padding: 0; }
-.dm-item { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+/* Mirror Logseq's native "scheduled and deadline" block: a 32px top gap (mt-8),
+   an H2-style heading OUTSIDE the box, then a grey rounded card with the list.
+   Values measured from the native block at runtime. */
+.dm-root { margin: 32px 0 0; padding: 0; }
+.dm-title { font-size: 16px; font-weight: 500; text-transform: uppercase;
+  color: var(--ls-primary-text-color, rgb(23, 23, 23)); margin: 0; }
+.dm-list { list-style: none; margin: 8px 0; padding: 16px; border-radius: 4px;
+  background: var(--color-level-1, rgb(247, 248, 248)); }
+.dm-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
 .dm-icon { width: 1.3em; text-align: center; }
 .dm-link { cursor: pointer; }
 .dm-link:hover { text-decoration: underline; }
