@@ -55,6 +55,53 @@ describe("computeOccurrence — none (one-off)", () => {
   });
 });
 
+describe("computeOccurrence — monthly", () => {
+  it("advances to the same day next month when this month's has passed", () => {
+    const o = computeOccurrence({ year: null, month: 1, day: 10 }, "monthly", TODAY);
+    expect(fmt(o.next)).toBe("2026-07-10"); // TODAY = 2026-06-28
+    expect(o.daysUntil).toBe(12);
+  });
+
+  it("treats today as the occurrence (daysUntil 0)", () => {
+    const o = computeOccurrence({ year: null, month: 1, day: 28 }, "monthly", TODAY);
+    expect(fmt(o.next)).toBe("2026-06-28");
+    expect(o.daysUntil).toBe(0);
+  });
+
+  it("clamps a big day-of-month to the current month's length", () => {
+    // April has 30 days; day 31 should land on the 30th, not overflow to May.
+    const o = computeOccurrence(
+      { year: null, month: 1, day: 31 },
+      "monthly",
+      dayjs("2026-04-10"),
+    );
+    expect(fmt(o.next)).toBe("2026-04-30");
+  });
+
+  it("does not skip a month when rolling over from a month-end today (regression)", () => {
+    // today = Jan 31, target day 30: the next 30th is Feb 28 (Feb has no 30th),
+    // NOT Mar 2. Previously the rollover used the unclamped day and overflowed.
+    const o = computeOccurrence(
+      { year: null, month: 1, day: 30 },
+      "monthly",
+      dayjs("2026-01-31"),
+    );
+    expect(fmt(o.next)).toBe("2026-02-28");
+    expect(o.daysUntil).toBe(28);
+  });
+
+  it("rolls a day-31 target over a 30-day month to that month's end", () => {
+    // today = Apr 1, target day 31: April has no 31st, so it clamps to Apr 30.
+    const o = computeOccurrence(
+      { year: null, month: 1, day: 31 },
+      "monthly",
+      dayjs("2026-04-01"),
+    );
+    expect(fmt(o.next)).toBe("2026-04-30");
+    expect(o.daysUntil).toBe(29);
+  });
+});
+
 describe("computeOccurrence — everyDays", () => {
   it("advances by whole steps from the anchor", () => {
     const o = computeOccurrence(

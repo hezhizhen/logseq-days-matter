@@ -65,7 +65,12 @@ export function computeOccurrence(
 
   if (recurrence === "monthly") {
     let next = t.date(Math.min(day, t.daysInMonth()));
-    if (next.isBefore(t, "day")) next = next.add(1, "month").date(day);
+    if (next.isBefore(t, "day")) {
+      // Roll to next month, clamping `day` to *that* month's length so a big
+      // day-of-month (e.g. 30/31) can't overflow into the month after.
+      const m = next.add(1, "month");
+      next = m.date(Math.min(day, m.daysInMonth()));
+    }
     next = next.startOf("day");
     const count = year === null ? null : next.diff(anchor, "month");
     return { next, daysUntil: next.diff(t, "day"), daysSince: daysSince(anchor), count };
