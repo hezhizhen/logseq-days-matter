@@ -1,6 +1,6 @@
 {
     "name": "logseq-days-matter",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "description": "Show birthday / anniversary / countdown reminders from page properties in your Logseq journal — Days Matter style.",
     "main": "dist/index.html",
     "author": "Zhizhen He",
