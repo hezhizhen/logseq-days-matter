@@ -1,15 +1,18 @@
 import "@logseq/libs";
+import dayjs from "dayjs";
 import { buildSection, GOTO_MODEL, type RenderEntry } from "./render";
 
 /** Key for our injected element. */
 const UI_KEY = "days-matter-journal";
 /**
- * Container to anchor the section under. `.journal-item.content` is the single
- * visible day's journal block. We inject as its last child, so the section
- * renders below the day's journal body. Verified at runtime; adjust here if a
- * future Logseq version renames it.
+ * Container to anchor the section under, matching where the native "scheduled
+ * and deadline" block renders — *today's* journal block:
+ *  - journals home (the scrolling multi-day list): the first `.journal-item.content`
+ *  - a single day's page (e.g. `#/page/2026/06/29`): `.page.is-journals`
+ * `querySelector` returns the first match, which on the home page is today's
+ * (top) block. Verified at runtime; adjust if a future Logseq version renames.
  */
-const CONTAINER_SELECTOR = ".journal-item.content";
+const CONTAINER_SELECTOR = ".journal-item.content, .page.is-journals";
 
 const CSS = `
 /* Mirror Logseq's native "scheduled and deadline" block: a 32px top gap (mt-8),
@@ -27,11 +30,20 @@ const CSS = `
 .dm-meta { opacity: .65; font-size: .85em; margin-left: auto; }
 `;
 
-/** True when the current view is the journals home or a journal page. */
-async function isJournalContext(): Promise<boolean> {
+/**
+ * True when today's journal is on screen — mirroring the native "scheduled and
+ * deadline" block, which only shows on *today's* journal. That means either the
+ * journals home (where today is the top block; `getCurrentPage()` returns null)
+ * or a single-day page whose `journalDay` equals today.
+ */
+async function isTodayVisible(): Promise<boolean> {
   try {
     const page = (await logseq.Editor.getCurrentPage()) as any;
-    return !page || page["journal?"] === true || page["journalDay"] != null;
+    // Journals home: not on a specific page → today's block is shown at top.
+    if (!page) return true;
+    // A page: only when it's a journal AND it is today.
+    const todayNum = Number(dayjs().format("YYYYMMDD"));
+    return page["journalDay"] === todayNum;
   } catch {
     return true; // default to showing
   }
@@ -55,12 +67,12 @@ function whenContainerReady(cb: () => void): void {
   setTimeout(() => obs.disconnect(), 5000);
 }
 
+/** Render entries into the journal. */
 function paint(entries: RenderEntry[]): void {
-  const html = buildSection(entries);
   logseq.provideUI({
     key: UI_KEY,
     path: CONTAINER_SELECTOR,
-    template: html || "<div></div>", // empty clears the section
+    template: buildSection(entries) || "<div></div>", // empty clears the section
     replace: true,
   });
 }
@@ -69,6 +81,10 @@ function paint(entries: RenderEntry[]): void {
  * Wire up automatic injection of the Days Matter section into the journal view.
  * Registers route/settings listeners once; `getEntries` is read fresh each time
  * so settings/config changes are reflected.
+ *
+ * Refreshes are debounced (route changes fire rapidly during navigation) and
+ * guarded against re-entrancy: if a refresh is already running, the latest
+ * request is deferred and run once when it finishes — so queries never stack.
  */
 export function setupInjection(getEntries: () => Promise<RenderEntry[]>): void {
   logseq.provideStyle(CSS);
@@ -79,14 +95,39 @@ export function setupInjection(getEntries: () => Promise<RenderEntry[]>): void {
     },
   });
 
-  const refresh = () =>
+  const DEBOUNCE_MS = 150;
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let running = false;
+  let pending = false;
+
+  const runOnce = () =>
     whenContainerReady(async () => {
-      if (!(await isJournalContext())) {
-        paint([]);
+      if (running) {
+        pending = true; // coalesce into a single follow-up run
         return;
       }
-      paint(await getEntries());
+      running = true;
+      try {
+        if (!(await isTodayVisible())) {
+          paint([]);
+        } else {
+          paint(await getEntries());
+        }
+      } catch (e) {
+        console.error("[days-matter] refresh failed", e);
+      } finally {
+        running = false;
+        if (pending) {
+          pending = false;
+          runOnce(); // a request arrived mid-flight — serve it now
+        }
+      }
     });
+
+  const refresh = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runOnce, DEBOUNCE_MS);
+  };
 
   logseq.App.onRouteChanged(() => refresh());
   logseq.onSettingsChanged(() => refresh());

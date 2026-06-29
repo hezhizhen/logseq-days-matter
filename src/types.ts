@@ -1,7 +1,7 @@
 /**
- * Config-driven "date property types". Adding a new type (wedding, work
- * anniversary, a one-off countdown, …) means adding one entry here / in
- * plugin settings — no code change.
+ * "Date property types" — the shape each tracked property (birthday, death
+ * anniversary, …) takes. The two built-in types are defined in the settings
+ * schema (`src/index.ts`); adding another currently means adding it there too.
  */
 
 /** How a date repeats. `none` = a fixed one-off date (count down / up to it). */
@@ -23,33 +23,7 @@ export interface DateType {
   /** Display icon / emoji, distinct per type. */
   icon: string;
   recurrence: Recurrence;
-  /**
-   * Days before the next occurrence to start showing this entry.
-   * `null` => fall back to the graph's `:scheduled/future-days`.
-   */
-  leadDays: number | null;
+  /** Days before the next occurrence to start showing this entry. */
+  leadDays: number;
   show: ShowKind;
 }
-
-/** Shipped defaults. Users override via plugin settings (`types`). */
-export const DEFAULT_TYPES: DateType[] = [
-  {
-    property: "birthday",
-    label: "Birthday",
-    icon: "🎂",
-    recurrence: "yearly",
-    leadDays: 7,
-    show: "age",
-  },
-  {
-    property: "deathday",
-    label: "Death anniversary",
-    icon: "🕯️",
-    recurrence: "yearly",
-    leadDays: 0,
-    show: "ordinal",
-  },
-];
-
-/** Used when a type's `leadDays` is null and the graph config is unreadable. */
-export const DEFAULT_FUTURE_DAYS = 7;

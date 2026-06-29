@@ -1,7 +1,6 @@
 import "@logseq/libs";
 import type { SettingSchemaDesc } from "@logseq/libs/dist/LSPlugin";
 import {
-  DEFAULT_FUTURE_DAYS,
   type DateType,
   type Recurrence,
   type ShowKind,
@@ -28,7 +27,7 @@ const SETTINGS: SettingSchemaDesc[] = [
   { key: "deathdayEnabled", type: "boolean", title: "Enabled", description: "Track the `deathday::` property.", default: true },
   { key: "deathdayIcon", type: "string", title: "Icon", description: "Emoji shown in the list.", default: "🕯️" },
   { key: "deathdayRecurrence", type: "enum", enumChoices: RECURRENCE_CHOICES, enumPicker: "select", title: "Recurrence", description: "", default: "yearly" },
-  { key: "deathdayLeadDays", type: "number", title: "Lead days", description: "Days before to start showing (0 = day-of only).", default: 0 },
+  { key: "deathdayLeadDays", type: "number", title: "Lead days", description: "Days before to start showing.", default: 3 },
   { key: "deathdayShow", type: "enum", enumChoices: SHOW_CHOICES, enumPicker: "select", title: "Show", description: "Number to display.", default: "ordinal" },
 ];
 
@@ -46,7 +45,7 @@ function num(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-/** Build the active type list from the rendered settings + extra JSON. */
+/** Build the active type list from the rendered settings. */
 function getTypes(): DateType[] {
   const s = (logseq.settings ?? {}) as Record<string, unknown>;
   const types: DateType[] = [];
@@ -67,30 +66,12 @@ function getTypes(): DateType[] {
       label: "Death anniversary",
       icon: str(s.deathdayIcon, "🕯️"),
       recurrence: str(s.deathdayRecurrence, "yearly") as Recurrence,
-      leadDays: num(s.deathdayLeadDays, 0),
+      leadDays: num(s.deathdayLeadDays, 3),
       show: str(s.deathdayShow, "ordinal") as ShowKind,
     });
   }
 
   return types;
-}
-
-/** Read `:scheduled/future-days` (graph config), with fallbacks. */
-async function getFutureDays(): Promise<number> {
-  try {
-    const cfg = (await logseq.App.getUserConfigs()) as any;
-    const v = cfg?.scheduledFutureDays;
-    if (typeof v === "number" && v >= 0) return v;
-  } catch {
-    /* ignore */
-  }
-  try {
-    const raw = await (logseq.App as any).getCurrentGraphConfigs?.(":scheduled/future-days");
-    if (typeof raw === "number" && raw >= 0) return raw;
-  } catch {
-    /* ignore */
-  }
-  return DEFAULT_FUTURE_DAYS;
 }
 
 async function getPreferredDateFormat(): Promise<string | undefined> {
@@ -103,13 +84,10 @@ async function getPreferredDateFormat(): Promise<string | undefined> {
 }
 
 async function getEntries() {
-  const [futureDays, fmt] = await Promise.all([
-    getFutureDays(),
-    getPreferredDateFormat(),
-  ]);
+  const fmt = await getPreferredDateFormat();
   const types = getTypes();
-  const entries = await collectEntries(types, futureDays, fmt);
-  console.debug("[days-matter] types=", types, "futureDays=", futureDays, "entries=", entries.length);
+  const entries = await collectEntries(types, fmt);
+  console.debug("[days-matter] types=", types, "entries=", entries.length);
   return entries;
 }
 

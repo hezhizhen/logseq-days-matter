@@ -9,13 +9,9 @@ import type { RenderEntry } from "./render";
  * Gather the entries to display: query each configured property, parse the
  * date, compute the next occurrence, keep those within the (per-type) lead
  * window, and sort by soonest.
- *
- * `futureDays` is the graph's `:scheduled/future-days`, used as the lead window
- * for types whose `leadDays` is null.
  */
 export async function collectEntries(
   types: DateType[],
-  futureDays: number,
   preferredDateFormat?: string,
   today: Dayjs = dayjs(),
 ): Promise<RenderEntry[]> {
@@ -32,10 +28,9 @@ export async function collectEntries(
     if (!parsed) continue;
 
     const occ = computeOccurrence(parsed, type.recurrence, today);
-    const lead = type.leadDays ?? futureDays;
 
     // Upcoming within the lead window (today counts as 0).
-    if (occ.daysUntil < 0 || occ.daysUntil > lead) continue;
+    if (occ.daysUntil < 0 || occ.daysUntil > type.leadDays) continue;
 
     entries.push({
       icon: type.icon,

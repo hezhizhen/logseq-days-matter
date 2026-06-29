@@ -4,23 +4,30 @@ Show birthday / anniversary / countdown reminders **from page properties** in yo
 Logseq journal. Add a date property to a page and it surfaces automatically — no
 `SCHEDULED` markers, no per-page setup.
 
-> File-based (Markdown) graphs.
+> **File-based (Markdown) graphs only.** This plugin reads page properties via
+> the file-graph datascript schema (`:block/properties`, `:block/pre-block?`).
+> The newer **database (DB) version** of Logseq uses a different schema and is
+> **not supported**.
 
 ![Days Matter showing birthday and death-anniversary entries in the journal view](./screenshot.png)
 
 ## What it does
 
-- Reads configured **date page-properties** (default `birthday::`, `deathday::`).
-- Computes the **next occurrence** (rolling yearly/monthly/weekly/every-N-days, or a one-off countdown) and the age / Nth anniversary / days-since.
-- Auto-injects a **"📅 Days Matter" section at the bottom of the journal view**, listing entries inside each type's lead window.
+- Reads configured **date page-properties** (default `birthday::`, `deathday::`) — only from a page's first/properties block, not from ordinary blocks.
+- Computes the **next occurrence** (rolling yearly/monthly/weekly, or a one-off countdown) and the age / Nth anniversary / days-since.
+- Auto-injects a **"Days Matter" section in the journal view** (styled to match the native "Scheduled and deadline" block), listing entries inside each type's lead window.
 
 ## Usage
 
-On any page (e.g. a person's page), add a property in the first block:
+On any page (e.g. a person's page), add a property in the **first block** (the
+page-properties block):
 
 ```
 birthday:: 1990-01-01
 ```
+
+> Only **page properties** (those in a page's first block) are read. A
+> `birthday::` placed on an ordinary block further down the page is ignored.
 
 Both forms work:
 
@@ -42,25 +49,6 @@ two built-in types — **Birthday** and **Death anniversary** — each with:
 - **Lead days** — days before to start showing
 - **Show** — `age` / `ordinal` / `daysUntil` / `daysSince` / `none`
 
-### Adding more types
-
-Under **Advanced — custom types**, add a JSON array of extra types:
-
-```json
-[
-  { "property": "wedding", "label": "Wedding", "icon": "💍", "recurrence": "yearly", "leadDays": 7, "show": "ordinal" },
-  { "property": "exam", "label": "Exam", "icon": "📝", "recurrence": "none", "leadDays": 30, "show": "daysUntil" }
-]
-```
-
-Each entry: `property`, `label`, `icon`, `recurrence`
-(`yearly` | `monthly` | `weekly` | `none` | `{"everyDays":N}`),
-`leadDays` (number, or `null` = use `:scheduled/future-days`),
-`show` (`age` | `ordinal` | `daysUntil` | `daysSince` | `none`).
-
-The default lead window for `leadDays: null` is read from your graph's
-`:scheduled/future-days` (default 7).
-
 ## Develop
 
 ```bash
@@ -71,6 +59,24 @@ npm run build     # type-check + bundle to dist/
 
 Load in Logseq: enable Developer mode → **Load unpacked plugin** → select this folder
 (after `npm run build`, since `main` is `dist/index.html`).
+
+## Releasing
+
+Releases are automated. Bumping the `version` in `package.json` and pushing to
+`master` triggers the [release workflow](.github/workflows/release.yml), which
+tags `vX.Y.Z`, builds, and publishes a marketplace-ready GitHub Release with the
+packaged zip attached. No manual `git tag` is needed.
+
+```bash
+# 1. bump "version" in package.json (e.g. 0.0.2 -> 0.0.3)
+# 2. commit and push to master
+git commit -am "release: v0.0.3"
+git push
+```
+
+Pushes that don't change the version are a no-op (the tag already exists). The
+Logseq marketplace tracks the latest GitHub Release automatically, so a new
+release reaches users without touching the marketplace repo again.
 
 ## License
 
