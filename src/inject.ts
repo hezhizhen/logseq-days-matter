@@ -67,6 +67,53 @@ function whenContainerReady(cb: () => void): void {
   setTimeout(() => obs.disconnect(), 5000);
 }
 
+/**
+ * Move our injected node to match the native order (… → scheduled-and-deadline
+ * → Days Matter → references). `provideUI({replace:true})` always appends as the
+ * container's last child — i.e. *after* references — so we relocate it once it's
+ * in the DOM.
+ *
+ * Primary anchor: the native "scheduled and deadline" block, which has a stable
+ * class (`.scheduled-or-deadlines`, hard-coded in Logseq). We insert right after
+ * it. That block only renders when there's scheduled data, so as a fallback
+ * (no scheduled items today) we place ourselves before the references section,
+ * identified by its heading text. If neither anchor is found we leave the node
+ * appended at the end rather than risk moving it somewhere wrong.
+ */
+function repositionInJournal(): void {
+  const doc = parent.document;
+  const node = doc.querySelector<HTMLElement>(
+    '[data-injected-ui*="days-matter"]',
+  );
+  const wrap = node?.parentElement;
+  if (!node || !wrap) return;
+
+  // Primary: insert just after the native scheduled-and-deadline block. It may
+  // be nested (e.g. inside a `.lazy-visibility` wrapper), so find it anywhere
+  // under wrap, then walk up to wrap's direct child to insert after.
+  const scheduled = wrap.querySelector(".scheduled-or-deadlines");
+  if (scheduled) {
+    let anchor: HTMLElement = scheduled as HTMLElement;
+    while (anchor.parentElement && anchor.parentElement !== wrap) {
+      anchor = anchor.parentElement;
+    }
+    if (anchor.parentElement === wrap && anchor.nextElementSibling !== node) {
+      anchor.after(node);
+    }
+    return;
+  }
+
+  // Fallback: insert before the references section (heading-text match).
+  const refs = [...wrap.children].find(
+    (c) =>
+      c !== node &&
+      /^\s*(Unlinked|Linked) References/.test(c.textContent ?? ""),
+  );
+  if (refs && refs.previousElementSibling !== node) {
+    wrap.insertBefore(node, refs);
+  }
+}
+
 /** Render entries into the journal. */
 function paint(entries: RenderEntry[]): void {
   logseq.provideUI({
@@ -75,6 +122,8 @@ function paint(entries: RenderEntry[]): void {
     template: buildSection(entries) || "<div></div>", // empty clears the section
     replace: true,
   });
+  // provideUI appends asynchronously; relocate after it lands in the DOM.
+  setTimeout(repositionInJournal, 0);
 }
 
 /**
