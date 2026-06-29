@@ -46,7 +46,10 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.check.outputs.release == 'true'
         with:
-          node-version: 20
+          # Node 22 (LTS): satisfies vite 8's engine requirement and ships an
+          # npm that does NOT have the npm 10.x "Exit handler never called!"
+          # crash that silently left node_modules half-installed on Node 20.
+          node-version: 22
           cache: npm
 
       - name: Install & build
