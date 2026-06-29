@@ -1,0 +1,55 @@
+name: Release
+
+# Build and attach a marketplace-ready zip whenever a version tag is pushed.
+#   git tag v0.1.0 && git push origin v0.1.0
+# The Logseq marketplace pulls each new tagged release automatically once the
+# plugin is registered, so this workflow is all the publishing automation the
+# repo itself needs.
+on:
+  push:
+    tags:
+      - "v*"
+
+# Required so the workflow can create a Release. Without this the run fails with
+# "403: Resource not accessible by integration".
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install & build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Package plugin
+        id: package
+        run: |
+          PLUGIN_ID=$(node -p "require('./package.json').logseq.id")
+          mkdir -p "$PLUGIN_ID"
+          cp -r dist "$PLUGIN_ID"/
+          cp package.json README.md "$PLUGIN_ID"/
+          [ -f LICENSE ] && cp LICENSE "$PLUGIN_ID"/ || true
+          [ -f icon.png ] && cp icon.png "$PLUGIN_ID"/ || true
+          ZIP="$PLUGIN_ID-${GITHUB_REF_NAME}.zip"
+          zip -r "$ZIP" "$PLUGIN_ID"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          # package.json is uploaded alongside the zip so the marketplace can
+          # read the version without unpacking.
+          artifacts: "${{ steps.package.outputs.zip }},package.json"
+          allowUpdates: true
+          draft: false
+          prerelease: false

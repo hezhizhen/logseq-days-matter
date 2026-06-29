@@ -25,6 +25,7 @@
   "logseq": {
     "id": "logseq-days-matter",
     "title": "Days Matter",
+    "icon": "icon.png",
     "main": "dist/index.html"
   }
 }

@@ -6,6 +6,8 @@ Logseq journal. Add a date property to a page and it surfaces automatically — 
 
 > File-based (Markdown) graphs.
 
+![Days Matter showing birthday and death-anniversary entries in the journal view](./screenshot.png)
+
 ## What it does
 
 - Reads configured **date page-properties** (default `birthday::`, `deathday::`).
