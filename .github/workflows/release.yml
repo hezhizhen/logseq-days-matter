@@ -1,37 +1,62 @@
 name: Release
 
-# Build and attach a marketplace-ready zip whenever a version tag is pushed.
-#   git tag v0.1.0 && git push origin v0.1.0
-# The Logseq marketplace pulls each new tagged release automatically once the
-# plugin is registered, so this workflow is all the publishing automation the
-# repo itself needs.
+# Auto-release on version bump. Push to master with a new `version` in
+# package.json and this workflow tags it (vX.Y.Z), builds, and publishes a
+# marketplace-ready Release — all in one job. No manual `git tag` needed.
+#
+# To cut a release:  bump package.json "version" -> commit -> push to master.
+# Pushes that don't change the version are a no-op (the tag already exists).
+#
+# Why one job instead of "tag -> tag triggers release.yml": pushes made with
+# the default GITHUB_TOKEN do NOT trigger further workflows, so a second
+# tag-triggered run would never fire. Doing everything here sidesteps that.
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - master
 
-# Required so the workflow can create a Release. Without this the run fails with
-# "403: Resource not accessible by integration".
+# Required so the workflow can push a tag and create a Release. Without this it
+# fails with "403: Resource not accessible by integration".
 permissions:
   contents: write
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full history + tags to detect an existing tag
+
+      - name: Read version & check for existing tag
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists — nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version detected: $TAG"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.release == 'true'
         with:
           node-version: 20
           cache: npm
 
       - name: Install & build
+        if: steps.check.outputs.release == 'true'
         run: |
           npm ci
           npm run build
 
       - name: Package plugin
+        if: steps.check.outputs.release == 'true'
         id: package
         run: |
           PLUGIN_ID=$(node -p "require('./package.json').logseq.id")
@@ -40,13 +65,18 @@ jobs:
           cp package.json README.md "$PLUGIN_ID"/
           [ -f LICENSE ] && cp LICENSE "$PLUGIN_ID"/ || true
           [ -f icon.png ] && cp icon.png "$PLUGIN_ID"/ || true
-          ZIP="$PLUGIN_ID-${GITHUB_REF_NAME}.zip"
+          ZIP="$PLUGIN_ID-${{ steps.check.outputs.tag }}.zip"
           zip -r "$ZIP" "$PLUGIN_ID"
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
-      - name: Create release
+      - name: Create tag & release
+        if: steps.check.outputs.release == 'true'
         uses: ncipollo/release-action@v1
         with:
+          # release-action creates the tag itself from `tag` against the pushed
+          # commit, so no separate `git tag`/`git push` step is needed.
+          tag: ${{ steps.check.outputs.tag }}
+          commit: ${{ github.sha }}
           # package.json is uploaded alongside the zip so the marketplace can
           # read the version without unpacking.
           artifacts: "${{ steps.package.outputs.zip }},package.json"
