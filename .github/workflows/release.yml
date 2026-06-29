@@ -46,10 +46,11 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.check.outputs.release == 'true'
         with:
-          # Node 22 (LTS): satisfies vite 8's engine requirement and ships an
-          # npm that does NOT have the npm 10.x "Exit handler never called!"
-          # crash that silently left node_modules half-installed on Node 20.
-          node-version: 22
+          # Node 24 (LTS Krypton) ships npm 11. Node 20/22 ship npm 10.x, which
+          # has the "Exit handler never called!" crash that silently leaves
+          # node_modules half-installed (then tsc reports every module as
+          # missing). npm 11 fixes it and matches the local toolchain.
+          node-version: 24
           cache: npm
 
       - name: Install & build
