@@ -1,9 +1,9 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <!-- background: rounded square, warm slate -->
-  <rect x="16" y="16" width="480" height="480" rx="104" fill="#4f46e5"/>
-
-  <!-- calendar body -->
-  <g>
+  <!-- transparent background; content scaled to fill the canvas. The artwork's
+       bounding box is ~(116,100)-(396,400), center (256,250). This transform
+       scales it 1.5x around that center and recenters to the canvas center. -->
+  <g transform="translate(256 256) scale(1.5) translate(-256 -250)">
+    <!-- calendar body -->
     <!-- page -->
     <rect x="116" y="132" width="280" height="268" rx="32" fill="#ffffff"/>
     <!-- header bar -->
@@ -12,13 +12,13 @@
     <!-- binding rings -->
     <rect x="168" y="100" width="20" height="64" rx="10" fill="#1e293b"/>
     <rect x="324" y="100" width="20" height="64" rx="10" fill="#1e293b"/>
-  </g>
 
-  <!-- heart sitting on the calendar page -->
-  <path d="M256 232
-           c-24 -32 -84 -26 -84 19
-           c0 41 54 69 84 99
-           c30 -30 84 -58 84 -99
-           c0 -45 -60 -51 -84 -19 z"
-        fill="#e11d48"/>
+    <!-- heart sitting on the calendar page -->
+    <path d="M256 232
+             c-24 -32 -84 -26 -84 19
+             c0 41 54 69 84 99
+             c30 -30 84 -58 84 -99
+             c0 -45 -60 -51 -84 -19 z"
+          fill="#e11d48"/>
+  </g>
 </svg>
