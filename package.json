@@ -18,9 +18,9 @@
     },
     "devDependencies": {
         "typescript": "^5.9.3",
-        "vite": "^4.5.14",
+        "vite": "^8.1.0",
         "vite-plugin-logseq": "^1.1.2",
-        "vitest": "^0.34.6"
+        "vitest": "^4.1.9"
     },
     "logseq": {
         "id": "logseq-days-matter",
