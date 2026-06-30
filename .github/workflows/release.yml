@@ -63,14 +63,17 @@ jobs:
         if: steps.check.outputs.release == 'true'
         id: package
         run: |
+          # Logseq unpacks the release zip as-is and reads package.json from the
+          # archive ROOT, then resolves `main` (dist/index.html) relative to it.
+          # So dist/ and package.json must sit at the zip root — NOT nested under
+          # a folder. Zipping the files directly (no wrapping dir) is what the
+          # known-good plugins (tabs, heatmap) do.
           PLUGIN_ID=$(node -p "require('./package.json').logseq.id")
-          mkdir -p "$PLUGIN_ID"
-          cp -r dist "$PLUGIN_ID"/
-          cp package.json README.md "$PLUGIN_ID"/
-          [ -f LICENSE ] && cp LICENSE "$PLUGIN_ID"/ || true
-          [ -f icon.png ] && cp icon.png "$PLUGIN_ID"/ || true
           ZIP="$PLUGIN_ID-${{ steps.check.outputs.tag }}.zip"
-          zip -r "$ZIP" "$PLUGIN_ID"
+          FILES="dist package.json README.md"
+          [ -f LICENSE ] && FILES="$FILES LICENSE"
+          [ -f icon.png ] && FILES="$FILES icon.png"
+          zip -r "$ZIP" $FILES
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
 
       - name: Create tag & release
