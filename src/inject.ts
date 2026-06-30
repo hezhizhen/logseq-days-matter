@@ -49,22 +49,46 @@ async function isTodayVisible(): Promise<boolean> {
   }
 }
 
-/** Wait for the container to exist in the host document, then run cb. */
+/**
+ * Wait for the container to exist in the host document, then run cb.
+ *
+ * Must NOT touch `parent.document`: when installed from the marketplace the
+ * plugin iframe is served from `lsp://logseq.io`, a *different origin* than the
+ * host window, so reading `parent.document` throws a cross-origin SecurityError
+ * (locally, `file://`/dev is same-origin, which is why it "worked" there). We
+ * instead probe via `logseq.UI.queryElementRect`, which runs the query in the
+ * host and is cross-origin safe.
+ */
 function whenContainerReady(cb: () => void): void {
-  const doc = parent.document;
-  if (doc.querySelector(CONTAINER_SELECTOR)) {
-    cb();
-    return;
-  }
-  const obs = new MutationObserver(() => {
-    if (doc.querySelector(CONTAINER_SELECTOR)) {
-      obs.disconnect();
-      cb();
+  const DEADLINE_MS = 5000;
+  const POLL_MS = 100;
+  let waited = 0;
+  let loggedErr = false;
+
+  const tick = async () => {
+    let found = false;
+    try {
+      // Returns the rect (truthy) when the selector matches in the host, else null.
+      found = !!(await logseq.UI.queryElementRect(CONTAINER_SELECTOR));
+    } catch (e) {
+      // Probe failed: treat as "not ready yet" and keep polling. Do NOT fire
+      // cb here — that would run before the journal container exists, and
+      // provideUI({path}) would silently no-op against a missing selector,
+      // leaving the section unrendered. Log once to avoid per-tick spam.
+      if (!loggedErr) {
+        console.error("[days-matter] queryElementRect failed", e);
+        loggedErr = true;
+      }
     }
-  });
-  obs.observe(doc.body, { childList: true, subtree: true });
-  // Safety: stop observing after a few seconds.
-  setTimeout(() => obs.disconnect(), 5000);
+    if (found) {
+      cb();
+      return;
+    }
+    waited += POLL_MS;
+    if (waited < DEADLINE_MS) setTimeout(tick, POLL_MS);
+  };
+
+  tick();
 }
 
 /**
@@ -79,9 +103,26 @@ function whenContainerReady(cb: () => void): void {
  * (no scheduled items today) we place ourselves before the references section,
  * identified by its heading text. If neither anchor is found we leave the node
  * appended at the end rather than risk moving it somewhere wrong.
+ *
+ * Reading `parent.document` only works when the plugin is same-origin with the
+ * host (local `file://`/dev). From the marketplace the iframe is `lsp://` —
+ * a different origin — so the access throws a cross-origin SecurityError. That
+ * is purely cosmetic (repositioning), so we wrap the whole thing and bail out
+ * quietly: the section is already injected by `provideUI`, it just stays at its
+ * default position (after references) instead of being moved up.
  */
 function repositionInJournal(): void {
-  const doc = parent.document;
+  let doc: Document;
+  try {
+    doc = parent.document;
+    // Touch a property to force the cross-origin check to throw here, not later.
+    void doc.body;
+  } catch {
+    // Cross-origin (marketplace install): can't reposition. The section is
+    // still shown via provideUI; we just can't move it. Safe to skip.
+    return;
+  }
+
   const node = doc.querySelector<HTMLElement>(
     '[data-injected-ui*="days-matter"]',
   );
