@@ -5,14 +5,26 @@ import { buildSection, GOTO_MODEL, type RenderEntry } from "./render";
 /** Key for our injected element. */
 const UI_KEY = "days-matter-journal";
 /**
- * Container to anchor the section under, matching where the native "scheduled
- * and deadline" block renders — *today's* journal block:
- *  - journals home (the scrolling multi-day list): the first `.journal-item.content`
- *  - a single day's page (e.g. `#/page/2026/06/29`): `.page.is-journals`
- * `querySelector` returns the first match, which on the home page is today's
- * (top) block. Verified at runtime; adjust if a future Logseq version renames.
+ * Container to anchor the section under: the per-day wrapper `.flex-1.journal.page`,
+ * which is the *direct* parent of both the native "scheduled and deadline" block
+ * and the references block. We inject here (not the outer `.journal-item.content`)
+ * so our appended node becomes a real sibling of scheduled/references — a
+ * prerequisite for the CSS `order` reordering below to work at all.
+ *
+ * Structure verified at runtime (both journals home and a single-day page):
+ *   .flex-1.journal.page
+ *     ├─ .flex.flex-col      (day blocks)
+ *     ├─ .mt-10
+ *     ├─ .lazy-visibility    (scheduled-and-deadline)
+ *     ├─ .lazy-visibility    (references)
+ *     └─ <div> > .dm-root    (our section, appended last by provideUI)
+ *
+ * On journals home there is one `.flex-1.journal.page` per day; `querySelector`
+ * returns the first, which is today's (top) block. Note: an earlier `.page.is-journals`
+ * selector was a dead end — that element does not exist in this Logseq version
+ * (verified: it never matched, so the old CSS `order` rules never applied).
  */
-const CONTAINER_SELECTOR = ".journal-item.content, .page.is-journals";
+const CONTAINER_SELECTOR = ".flex-1.journal.page";
 
 const CSS = `
 /* Mirror Logseq's native "scheduled and deadline" block: a 32px top gap (mt-8),
@@ -28,6 +40,27 @@ const CSS = `
 .dm-link { cursor: pointer; }
 .dm-link:hover { text-decoration: underline; }
 .dm-meta { opacity: .65; font-size: .85em; margin-left: auto; }
+
+/* Position the section between the native "scheduled and deadline" block and
+   the references — WITHOUT moving the DOM node. provideUI({path}) can only
+   append to the container's end (after references), and a marketplace (lsp://)
+   install is cross-origin so we can't relocate the node in JS. Instead we flex
+   the container and reorder via CSS \`order\`, which is origin-safe.
+
+   This works because we inject into \`.flex-1.journal.page\` (see CONTAINER_SELECTOR):
+   the day blocks, the scheduled block, the references block AND our appended
+   section are all *direct children* of it — i.e. real siblings that \`order\` can
+   sort. Structure verified at runtime; the previously-tried \`.page.is-journals\`
+   container does not exist in this Logseq version, which is why the old rules
+   never took effect.
+
+   Scoped with \`:has(.dm-root)\` so only a day that actually contains our section
+   is touched; every other page renders unchanged. \`:has()\` verified at runtime.
+   Day blocks + scheduled keep the default order:0 (DOM order preserved), our
+   section gets a middle order, and the references block is pushed last. */
+.flex-1.journal.page:has(.dm-root) { display: flex; flex-direction: column; }
+.flex-1.journal.page:has(.dm-root) > div:has(> .dm-root) { order: 5; }
+.flex-1.journal.page:has(.dm-root) > div:has(.references) { order: 10; }
 `;
 
 /**
@@ -91,70 +124,6 @@ function whenContainerReady(cb: () => void): void {
   tick();
 }
 
-/**
- * Move our injected node to match the native order (… → scheduled-and-deadline
- * → Days Matter → references). `provideUI({replace:true})` always appends as the
- * container's last child — i.e. *after* references — so we relocate it once it's
- * in the DOM.
- *
- * Primary anchor: the native "scheduled and deadline" block, which has a stable
- * class (`.scheduled-or-deadlines`, hard-coded in Logseq). We insert right after
- * it. That block only renders when there's scheduled data, so as a fallback
- * (no scheduled items today) we place ourselves before the references section,
- * identified by its heading text. If neither anchor is found we leave the node
- * appended at the end rather than risk moving it somewhere wrong.
- *
- * Reading `parent.document` only works when the plugin is same-origin with the
- * host (local `file://`/dev). From the marketplace the iframe is `lsp://` —
- * a different origin — so the access throws a cross-origin SecurityError. That
- * is purely cosmetic (repositioning), so we wrap the whole thing and bail out
- * quietly: the section is already injected by `provideUI`, it just stays at its
- * default position (after references) instead of being moved up.
- */
-function repositionInJournal(): void {
-  let doc: Document;
-  try {
-    doc = parent.document;
-    // Touch a property to force the cross-origin check to throw here, not later.
-    void doc.body;
-  } catch {
-    // Cross-origin (marketplace install): can't reposition. The section is
-    // still shown via provideUI; we just can't move it. Safe to skip.
-    return;
-  }
-
-  const node = doc.querySelector<HTMLElement>(
-    '[data-injected-ui*="days-matter"]',
-  );
-  const wrap = node?.parentElement;
-  if (!node || !wrap) return;
-
-  // Primary: insert just after the native scheduled-and-deadline block. It may
-  // be nested (e.g. inside a `.lazy-visibility` wrapper), so find it anywhere
-  // under wrap, then walk up to wrap's direct child to insert after.
-  const scheduled = wrap.querySelector(".scheduled-or-deadlines");
-  if (scheduled) {
-    let anchor: HTMLElement = scheduled as HTMLElement;
-    while (anchor.parentElement && anchor.parentElement !== wrap) {
-      anchor = anchor.parentElement;
-    }
-    if (anchor.parentElement === wrap && anchor.nextElementSibling !== node) {
-      anchor.after(node);
-    }
-    return;
-  }
-
-  // Fallback: insert before the references section (heading-text match).
-  const refs = [...wrap.children].find(
-    (c) =>
-      c !== node &&
-      /^\s*(Unlinked|Linked) References/.test(c.textContent ?? ""),
-  );
-  if (refs && refs.previousElementSibling !== node) {
-    wrap.insertBefore(node, refs);
-  }
-}
-
 /** Render entries into the journal. */
 function paint(entries: RenderEntry[]): void {
   logseq.provideUI({
@@ -163,8 +132,10 @@ function paint(entries: RenderEntry[]): void {
     template: buildSection(entries) || "<div></div>", // empty clears the section
     replace: true,
   });
-  // provideUI appends asynchronously; relocate after it lands in the DOM.
-  setTimeout(repositionInJournal, 0);
+  // No JS repositioning: provideUI appends to the container's end (after
+  // references), and the section is moved into place purely via CSS `order`
+  // (see the CSS block above). That works under both same-origin and the
+  // cross-origin (lsp://) marketplace sandbox, with no `parent.document` access.
 }
 
 /**
