@@ -42,6 +42,13 @@ describe("buildSection", () => {
     expect(buildSection([])).toBe("");
   });
 
+  it.each([0, 7, 365])("shows the empty reminder window of %s days", (leadDays) => {
+    const html = buildSection([], leadDays);
+    expect(html).toContain("Days Matter");
+    expect(html).toContain(`未来 ${leadDays} 天暂无提醒`);
+    expect(html).not.toContain("dm-link");
+  });
+
   it("renders an item with link, icon and meta", () => {
     const e: RenderEntry = {
       icon: "🎂",

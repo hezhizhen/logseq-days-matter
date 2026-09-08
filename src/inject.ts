@@ -11,7 +11,7 @@ const UI_KEY = "days-matter-journal";
  * so our appended node becomes a real sibling of scheduled/references — a
  * prerequisite for the CSS `order` reordering below to work at all.
  *
- * Structure verified at runtime (both journals home and a single-day page):
+ * Journals home structure:
  *   .flex-1.journal.page
  *     ├─ .flex.flex-col      (day blocks)
  *     ├─ .mt-10
@@ -20,11 +20,10 @@ const UI_KEY = "days-matter-journal";
  *     └─ <div> > .dm-root    (our section, appended last by provideUI)
  *
  * On journals home there is one `.flex-1.journal.page` per day; `querySelector`
- * returns the first, which is today's (top) block. Note: an earlier `.page.is-journals`
- * selector was a dead end — that element does not exist in this Logseq version
- * (verified: it never matched, so the old CSS `order` rules never applied).
+ * returns the first, which is today's (top) block. Standalone journal pages
+ * instead use `.page.is-journals`, without the `journal` class.
  */
-const CONTAINER_SELECTOR = ".flex-1.journal.page";
+const CONTAINER_SELECTOR = ".flex-1.journal.page, .page.is-journals";
 
 const CSS = `
 /* Mirror Logseq's native "scheduled and deadline" block: a 32px top gap (mt-8),
@@ -47,20 +46,16 @@ const CSS = `
    install is cross-origin so we can't relocate the node in JS. Instead we flex
    the container and reorder via CSS \`order\`, which is origin-safe.
 
-   This works because we inject into \`.flex-1.journal.page\` (see CONTAINER_SELECTOR):
-   the day blocks, the scheduled block, the references block AND our appended
-   section are all *direct children* of it — i.e. real siblings that \`order\` can
-   sort. Structure verified at runtime; the previously-tried \`.page.is-journals\`
-   container does not exist in this Logseq version, which is why the old rules
-   never took effect.
-
    Scoped with \`:has(.dm-root)\` so only a day that actually contains our section
    is touched; every other page renders unchanged. \`:has()\` verified at runtime.
    Day blocks + scheduled keep the default order:0 (DOM order preserved), our
    section gets a middle order, and the references block is pushed last. */
-.flex-1.journal.page:has(.dm-root) { display: flex; flex-direction: column; }
-.flex-1.journal.page:has(.dm-root) > div:has(> .dm-root) { order: 5; }
-.flex-1.journal.page:has(.dm-root) > div:has(.references) { order: 10; }
+.flex-1.journal.page:has(.dm-root),
+.page.is-journals:has(.dm-root) { display: flex; flex-direction: column; }
+.flex-1.journal.page:has(.dm-root) > div:has(> .dm-root),
+.page.is-journals:has(.dm-root) > div:has(> .dm-root) { order: 5; }
+.flex-1.journal.page:has(.dm-root) > div:has(.references),
+.page.is-journals:has(.dm-root) > div:has(.references) { order: 10; }
 `;
 
 /**
@@ -125,11 +120,11 @@ function whenContainerReady(cb: () => void): void {
 }
 
 /** Render entries into the journal. */
-function paint(entries: RenderEntry[]): void {
+function paint(entries: RenderEntry[], leadDays?: number): void {
   logseq.provideUI({
     key: UI_KEY,
     path: CONTAINER_SELECTOR,
-    template: buildSection(entries) || "<div></div>", // empty clears the section
+    template: buildSection(entries, leadDays) || "<div></div>", // empty clears the section
     replace: true,
   });
   // No JS repositioning: provideUI appends to the container's end (after
@@ -147,7 +142,10 @@ function paint(entries: RenderEntry[]): void {
  * guarded against re-entrancy: if a refresh is already running, the latest
  * request is deferred and run once when it finishes — so queries never stack.
  */
-export function setupInjection(getEntries: () => Promise<RenderEntry[]>): void {
+export function setupInjection(
+  getEntries: () => Promise<RenderEntry[]>,
+  getLeadDays: () => number | undefined = () => undefined,
+): void {
   logseq.provideStyle(CSS);
   logseq.provideModel({
     async [GOTO_MODEL](e: any) {
@@ -172,7 +170,7 @@ export function setupInjection(getEntries: () => Promise<RenderEntry[]>): void {
         if (!(await isTodayVisible())) {
           paint([]);
         } else {
-          paint(await getEntries());
+          paint(await getEntries(), getLeadDays());
         }
       } catch (e) {
         console.error("[days-matter] refresh failed", e);

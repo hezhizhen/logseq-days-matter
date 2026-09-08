@@ -75,11 +75,13 @@ function renderItem(e: RenderEntry): string {
 
 /**
  * Build the section HTML for the given (already filtered & sorted) entries.
- * Returns "" when there is nothing to show.
+ * Returns "" for empty entries unless an empty-state reminder window is supplied.
  */
-export function buildSection(entries: RenderEntry[]): string {
-  if (entries.length === 0) return "";
-  const items = entries.map(renderItem).join("");
+export function buildSection(entries: RenderEntry[], leadDays?: number): string {
+  if (entries.length === 0 && leadDays === undefined) return "";
+  const items = entries.length > 0
+    ? entries.map(renderItem).join("")
+    : `<li class="dm-item">未来 ${escapeHtml(String(leadDays))} 天暂无提醒</li>`;
   return (
     `<div class="dm-root">` +
     `<div class="dm-title">Days Matter</div>` +

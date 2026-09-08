@@ -83,6 +83,11 @@ async function getPreferredDateFormat(): Promise<string | undefined> {
   }
 }
 
+function getLeadDays(): number | undefined {
+  const types = getTypes();
+  return types.length ? Math.max(...types.map((type) => type.leadDays)) : undefined;
+}
+
 async function getEntries() {
   const fmt = await getPreferredDateFormat();
   const types = getTypes();
@@ -124,13 +129,13 @@ function main() {
       key: `days-matter-${slot}`,
       slot,
       reset: true,
-      template: buildSection(entries) || "<i>No upcoming dates</i>",
+      template: buildSection(entries, getLeadDays()) || "<i>No upcoming dates</i>",
     });
   });
 
   // Primary surface: auto-inject a section at the bottom of the journal view.
-  setupInjection(getEntries);
-  (logseq.App as any).onCurrentGraphChanged?.(() => setupInjection(getEntries));
+  setupInjection(getEntries, getLeadDays);
+  (logseq.App as any).onCurrentGraphChanged?.(() => setupInjection(getEntries, getLeadDays));
 
   console.log("[days-matter] ready");
 }
