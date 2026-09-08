@@ -81,7 +81,7 @@ export function buildSection(entries: RenderEntry[], leadDays?: number): string 
   if (entries.length === 0 && leadDays === undefined) return "";
   const items = entries.length > 0
     ? entries.map(renderItem).join("")
-    : `<li class="dm-item">未来 ${escapeHtml(String(leadDays))} 天暂无提醒</li>`;
+    : `<li class="dm-item">暂无提醒</li>`;
   return (
     `<div class="dm-root">` +
     `<div class="dm-title">Days Matter</div>` +

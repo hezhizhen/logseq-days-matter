@@ -45,7 +45,7 @@ describe("buildSection", () => {
   it.each([0, 7, 365])("shows the empty reminder window of %s days", (leadDays) => {
     const html = buildSection([], leadDays);
     expect(html).toContain("Days Matter");
-    expect(html).toContain(`未来 ${leadDays} 天暂无提醒`);
+    expect(html).toContain('<li class="dm-item">暂无提醒</li>');
     expect(html).not.toContain("dm-link");
   });
 

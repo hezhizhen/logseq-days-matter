@@ -57,7 +57,7 @@ describe("journal injection", () => {
     const host = createHost(className, page);
     setupInjection(async () => [], () => 7);
     await vi.advanceTimersByTimeAsync(5200);
-    expect(host.html).toContain("未来 7 天暂无提醒");
+    expect(host.html).toContain('<li class="dm-item">暂无提醒</li>');
   });
 
   it("does not show an empty state on a past journal", async () => {
